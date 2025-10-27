@@ -334,8 +334,3 @@ class ngram_score(object):
         return score
        
 
-
-
-
-if __name__ == "__main__":
-    main()
