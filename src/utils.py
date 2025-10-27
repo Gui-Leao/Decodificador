@@ -4,15 +4,17 @@ import random
 from math import exp
 from typing import Tuple
 
+random.seed(42)
 
-def binary_to_ascii(file_path:str) -> str:
+
+def binary_to_ascii(text:str) -> str:
     """
     Pega o texto em binário e decodifica para a tabela ascII.
 
     Parâmetros:
     ----------
     file_path : str
-        Caminho do texto.
+        Recebe texto codificado.
 
     Retorna:
     -------
@@ -20,8 +22,7 @@ def binary_to_ascii(file_path:str) -> str:
         Retorna a mensagem codificada
     """
     
-    with open(file_path, "r") as f:
-        bits = f.read() 
+    bits = text
 
     message = ''.join([chr(int(b,2)) for b in bits.split()])
 
@@ -220,7 +221,7 @@ def genetic_decrypt(message:str, ngram_model:'ngram_score', pop_size:int = 500, 
         Número de indivíduos (chaves) na população do algoritmo genético.
     generations : int, opcional (default=1000)
         Número de gerações que o algoritmo irá evoluir.
-    mutation_rate : float, opcional (default=0.2)
+    mutation_rate : float, opcional (default=0.9)
         Probabilidade de mutação para cada filho gerado na população.
 
     Retorna:
@@ -234,10 +235,9 @@ def genetic_decrypt(message:str, ngram_model:'ngram_score', pop_size:int = 500, 
     1. Inicializa a população com chaves aleatórias.
     2. Para cada geração:
         a. Avalia o score de cada chave usando n-gramas.
-        b. Seleciona os melhores indivíduos (10%) como pais.
-        c. Gera novos filhos através de crossover (combinação dos pais).
-        d. Aplica mutação em alguns filhos com probabilidade `mutation_rate`.
-        e. Forma a nova população.
+        b. Seleciona os melhores indivíduos (10%) como pais para o crossover e mutação.
+        c. Gera nova população com (5%) de elitismo, (60%) crossover e o restante com mutação.
+
     3. Ao final, retorna o texto decifrado e a chave da melhor solução encontrada.
 
     """
@@ -246,25 +246,45 @@ def genetic_decrypt(message:str, ngram_model:'ngram_score', pop_size:int = 500, 
 
     population = [random_key() for _ in range(pop_size)]
     scores = []
-    for _ in range(generations):
+    for gen in range(generations):
+        # Avaliação da população
         scored = [(key, ngram_model.score(decrypt(message, key))) for key in population]
-        scored.sort(key=lambda x: x[1],reverse=True)
+        scored.sort(key=lambda x: x[1], reverse=True)
         best = scored[0]
         scores.append(best[1])
-        print(f"Geração: {_}, melhor score: {best[1]:.2f}, chave: {best[0]}")
-        
-        # Seleção
+
+        print(f"Geração: {gen}, melhor score: {best[1]:.2f}, chave: {best[0]}")
+
+        # Seleção dos melhores 10% como possíveis pais
         parents = [k for k, _ in scored[:pop_size // 10]]
-        # Nova população
-        new_pop = parents[:]
-        new_pop.append(random_key())
-        while len(new_pop) < pop_size:
+
+        # === Distribuição de reprodução ===
+        elite_size = int(pop_size * 0.05)   # 5% elitismo
+        cross_size = int(pop_size * 0.60)   # 60% crossover
+        mut_size   = pop_size - elite_size - cross_size  # restante (~35%)
+
+        new_pop = []
+
+        # Elitismo — mantém os melhores sem alteração
+        elites = [k for k, _ in scored[:elite_size]]
+        new_pop.extend(elites)
+
+        # Crossover — gera novos indivíduos cruzando pais
+        for _ in range(cross_size):
             p1, p2 = random.sample(parents, 2)
             child = crossover(p1, p2)
-            if random.random() < mutation_rate:
-                child = mutate(child)
             new_pop.append(child)
+
+        # Mutação — gera indivíduos mutados a partir de pais aleatórios
+        for _ in range(mut_size):
+            parent = random.choice(parents)
+            child = mutate(parent)
+            new_pop.append(child)
+
+        
+        new_pop = new_pop[:pop_size]
         population = new_pop
+
     return decrypt(message, best[0]), best[0]
 
 def agenetic_decrypt(ciphertext, ngram_model, pop_size=500, generations=1000, mutation_rate=0.2):

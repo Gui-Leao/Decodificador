@@ -1,6 +1,8 @@
 from src.utils import *
 
-message = binary_to_ascii("data/mensagem_codificada.txt")
+text = str(input())
+
+message = binary_to_ascii(text)
 ngram = ngram_score("data/quadgrams.txt")
 
 print(f"mensagem:\n {message}")
